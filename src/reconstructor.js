@@ -12,7 +12,8 @@
 //   { matchId?: string, turns: [ { matchId, turn, actor?, action, idempotencyKey?, state? } ] }
 //   action: { type: "STEAL"|"HOLD"|"FORTIFY", amount?, target? }
 //   state:  optional envelope balances { self, opponent } as reported by the
-//           platform before this turn (cross-checked in a later revision).
+//           platform before this turn (cross-checked against the
+//           reconstruction; a mismatch is illegal under rule A10).
 //
 // An illegal turn is reported with every rule it broke and is NOT applied:
 // replay continues from the last legal state.
@@ -187,6 +188,34 @@ function checkOneTurn(turn, ctx, state) {
     fail(errors, "A08-actor", `actor must be "self" or "opponent"; got ${JSON.stringify(turn.actor)}.`);
   }
 
+  // A10 — envelope state (when supplied) must match the reconstruction
+  // BEFORE this turn is applied.
+  if (turn.state !== undefined) {
+    const st = turn.state;
+    if (
+      !st ||
+      typeof st !== "object" ||
+      Array.isArray(st) ||
+      typeof st.self !== "number" ||
+      typeof st.opponent !== "number"
+    ) {
+      fail(
+        errors,
+        "A10-envelope-state",
+        "Envelope state must be an object with numeric self and opponent balances.",
+      );
+    } else if (
+      st.self !== state.balances.self ||
+      st.opponent !== state.balances.opponent
+    ) {
+      fail(
+        errors,
+        "A10-envelope-state",
+        `Envelope state self ${st.self} / opponent ${st.opponent} does not match the reconstructed balances self ${state.balances.self} / opponent ${state.balances.opponent} before this turn.`,
+      );
+    }
+  }
+
   // Action-specific rules. These run even when structural rules above
   // failed, so one turn can report every rule it broke.
   if (action && ACTIONS.includes(action.type)) {
@@ -225,6 +254,15 @@ function checkOneTurn(turn, ctx, state) {
           `STEAL target ${action.target} is ${owner === null ? "unowned (neutral)" : `owned by ${owner}`} — a STEAL target must be owned by the ${victim}.`,
         );
       } else {
+        // A09 — a fortified cell cannot be stolen, even when owned by the
+        // victim and adjacent.
+        if (state.board[action.target].fortified) {
+          fail(
+            errors,
+            "A09-fortified-blocks-steal",
+            `STEAL target ${action.target} is fortified — a fortified cell cannot be stolen.`,
+          );
+        }
         // A04 — target must be adjacent to a cell the actor owns.
         const reaches = CELLS.some(
           (cell) =>

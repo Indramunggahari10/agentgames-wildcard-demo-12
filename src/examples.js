@@ -198,6 +198,36 @@ export const EXAMPLES = [
     },
   },
   {
+    id: "steal-fortified-cell",
+    title: "Illegal — STEAL of a fortified cell",
+    description:
+      "Turn 1 (opponent) fortifies B2, which the opponent owns. Turn 2 (self) steals B2: it is opponent-owned and adjacent to A2, so ownership and adjacency pass — but B2 is fortified, and a fortified cell cannot be stolen (rule A09). Expected failure on turn 2: A09-fortified-blocks-steal. The cell stays opponent-owned and the balances stay 100 / 100.",
+    expectedVerdict: "illegal",
+    expectedErrorRules: ["A09-fortified-blocks-steal"],
+    input: {
+      matchId: MATCH,
+      turns: [
+        turn(MATCH, 1, { type: "FORTIFY", target: "B2" }, "key-1", { actor: "opponent" }),
+        turn(MATCH, 2, { type: "STEAL", amount: 5, target: "B2" }, "key-2"),
+      ],
+    },
+  },
+  {
+    id: "envelope-state-mismatch",
+    title: "Illegal — envelope balances disagree with the reconstruction",
+    description:
+      "Turn 1 holds with envelope state 100 / 100, which matches the reconstruction. Turn 2 holds but its envelope reports opponent 95 — while the replay says both sides still hold 100, because turn 1 changed nothing. The pasted sequence disagrees with the platform's own reported state (rule A10). Expected failure on turn 2: A10-envelope-state.",
+    expectedVerdict: "illegal",
+    expectedErrorRules: ["A10-envelope-state"],
+    input: {
+      matchId: MATCH,
+      turns: [
+        turn(MATCH, 1, { type: "HOLD" }, "key-1", { state: { self: 100, opponent: 100 } }),
+        turn(MATCH, 2, { type: "HOLD" }, "key-2", { state: { self: 100, opponent: 95 } }),
+      ],
+    },
+  },
+  {
     id: "turn-21-exceeds-cap",
     title: "Illegal — 21st turn exceeds the 20-turn cap",
     description:

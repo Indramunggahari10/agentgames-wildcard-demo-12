@@ -127,6 +127,31 @@ test("POST /api/check on the hold-with-amount example names R05-amount-omitted",
   assert.ok(body.turns[0].errors.some((e) => e.rule === "R05-amount-omitted"));
 });
 
+test("POST /api/check on the steal-fortified-cell example names A09", async () => {
+  const ex = EXAMPLES.find((e) => e.id === "steal-fortified-cell");
+  const res = await postCheck(ex.input);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.verdict, "illegal");
+  assert.equal(body.turns[0].verdict, "legal");
+  assert.equal(body.turns[1].verdict, "illegal");
+  assert.ok(
+    body.turns[1].errors.some((e) => e.rule === "A09-fortified-blocks-steal"),
+  );
+  assert.equal(body.finalState.balances.self, 100);
+});
+
+test("POST /api/check on the envelope-state-mismatch example names A10", async () => {
+  const ex = EXAMPLES.find((e) => e.id === "envelope-state-mismatch");
+  const res = await postCheck(ex.input);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.verdict, "illegal");
+  assert.equal(body.turns[0].verdict, "legal");
+  assert.equal(body.turns[1].verdict, "illegal");
+  assert.ok(body.turns[1].errors.some((e) => e.rule === "A10-envelope-state"));
+});
+
 test("POST /api/check with invalid JSON returns 400", async () => {
   const res = await postCheck("{not json", true);
   assert.equal(res.status, 400);

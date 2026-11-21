@@ -150,4 +150,20 @@ export const RULES = [
     detail:
       "Each turn may name an actor, 'self' (default) or 'opponent', so a full match log with both sides can be replayed. The actor is the side that steals, fortifies, and gains balance; the other side is the victim.",
   },
+  {
+    id: "A09-fortified-blocks-steal",
+    kind: "assumption",
+    spec: "Assumption — not published",
+    title: "A fortified cell cannot be stolen",
+    detail:
+      "Under the assumed board model FORTIFY marks a cell as defended, and a STEAL of a fortified cell is illegal even when the cell is opponent-owned and adjacent. The platform has published nothing about what FORTIFY protects, so this is an assumption.",
+  },
+  {
+    id: "A10-envelope-state",
+    kind: "assumption",
+    spec: "Assumption — not published (envelope carries the game state, SPEC.md §4)",
+    title: "Envelope balances must match the reconstruction",
+    detail:
+      "Each turn envelope carries the current game state (both balances). When a turn supplies state balances, they must equal the balances reconstructed from the previous turns, checked before this turn is applied. A mismatch means the pasted sequence disagrees with the platform's own reported state. Turns without a state field skip this check. Whether the envelope state is authoritative over the replay is an assumption of this tool.",
+  },
 ];

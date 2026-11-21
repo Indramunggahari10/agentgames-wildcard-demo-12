@@ -341,11 +341,83 @@ test("FORTIFY marks the cell and a later STEAL of it by the owner fails ownershi
   assert.equal(report.turns[1].verdict, "illegal");
 });
 
-test("envelope state field is tolerated in v1 (cross-check arrives in revision)", () => {
+test("A10: envelope state matching the reconstruction is legal", () => {
   const report = reconstructMatch(
-    seq([t(1, { type: "HOLD" }, "k1", { state: { self: 100, opponent: 100 } })]),
+    seq([
+      t(1, { type: "STEAL", amount: 10, target: "B2" }, "k1", {
+        state: { self: 100, opponent: 100 },
+      }),
+      t(2, { type: "HOLD" }, "k2", { state: { self: 110, opponent: 90 } }),
+    ]),
   );
   assert.equal(report.verdict, "legal");
+});
+
+test("A10: envelope state disagreeing on self is illegal", () => {
+  const report = reconstructMatch(
+    seq([t(1, { type: "HOLD" }, "k1", { state: { self: 99, opponent: 100 } })]),
+  );
+  assert.equal(report.verdict, "illegal");
+  assert.ok(allErrorRules(report).includes("A10-envelope-state"));
+});
+
+test("A10: envelope state disagreeing on opponent is illegal", () => {
+  const report = reconstructMatch(
+    seq([t(1, { type: "HOLD" }, "k1", { state: { self: 100, opponent: 101 } })]),
+  );
+  assert.ok(allErrorRules(report).includes("A10-envelope-state"));
+});
+
+test("A10: a malformed envelope state is illegal", () => {
+  const report = reconstructMatch(
+    seq([t(1, { type: "HOLD" }, "k1", { state: "100/100" })]),
+  );
+  assert.ok(allErrorRules(report).includes("A10-envelope-state"));
+  const report2 = reconstructMatch(
+    seq([t(1, { type: "HOLD" }, "k1", { state: { self: "100", opponent: 100 } })]),
+  );
+  assert.ok(allErrorRules(report2).includes("A10-envelope-state"));
+});
+
+test("A10: a turn without envelope state skips the cross-check", () => {
+  const report = reconstructMatch(seq([t(1, { type: "HOLD" })]));
+  assert.equal(report.verdict, "legal");
+});
+
+test("A09: stealing a fortified cell is illegal and changes nothing", () => {
+  const report = reconstructMatch(
+    seq([
+      t(1, { type: "FORTIFY", target: "B2" }, "k1", { actor: "opponent" }),
+      t(2, { type: "STEAL", amount: 5, target: "B2" }, "k2"),
+    ]),
+  );
+  assert.equal(report.turns[0].verdict, "legal");
+  assert.equal(report.turns[1].verdict, "illegal");
+  assert.ok(
+    report.turns[1].errors.some((e) => e.rule === "A09-fortified-blocks-steal"),
+  );
+  assert.equal(report.turns[1].errors.length, 1);
+  assert.equal(report.finalState.board.B2.owner, "opponent");
+  assert.equal(report.finalState.board.B2.fortified, true);
+  assert.equal(report.finalState.balances.self, 100);
+  assert.equal(report.finalState.balances.opponent, 100);
+});
+
+test("A09: a fortified cell cannot be stolen back after changing hands either", () => {
+  const report = reconstructMatch(
+    seq([
+      t(1, { type: "STEAL", amount: 10, target: "B2" }),
+      t(2, { type: "FORTIFY", target: "B2" }),
+      t(3, { type: "STEAL", amount: 5, target: "B2" }, "k3", { actor: "opponent" }),
+    ]),
+  );
+  // Turn 2 fortifies B2 (now self-owned); turn 3 opponent steals it back:
+  // B2 is fortified, so the steal must fail (and it is also not adjacent
+  // to any opponent cell, so A04 fails too).
+  assert.equal(report.turns[2].verdict, "illegal");
+  assert.ok(
+    report.turns[2].errors.some((e) => e.rule === "A09-fortified-blocks-steal"),
+  );
 });
 
 test("a non-object turn entry is reported illegal without stopping the replay", () => {
